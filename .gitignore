@@ -1,0 +1,41 @@
+# Python
+# Compiled source
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+*.egg-info/
+.Python
+build/
+dist/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE and editor files
+.idea/  # JetBrains IDEs (PyCharm, etc)
+.vscode/ # VS Code (can be more specific if needed)
+*.swp # vim
+
+# Temporary files and databases
+*.sqlite3
+*.db
+.coverage
+htmlcov/
+.tox/
+tmp/
+.mypy_cache/
+.pytest_cache/
+nosetests.xml
+
+# System files (optional, good for a global gitignore)
+.DS_Store # macOS
+Thumbs.db # Windows
+
+# Sensitive data (customize as needed)
+config.ini
+.env
+keys.py
+secrets.json
