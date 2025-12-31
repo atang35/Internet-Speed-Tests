@@ -14,15 +14,13 @@ services:
 
     volumes:
       - mssql-data:/var/opt/mssql
-
-    restart: unless-stopped
+      - ./sql/00_DDL.sql:/init/00_DDL.sql:ro
 
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "${SQLSERVER_PWD}", "-Q", "SELECT 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd", "-C", "-S", "localhost", "-U", "sa", "-P", "${SQLSERVER_PWD}", "-Q", "SELECT 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-volumes:
-  mssql-data:
+    restart: unless-stopped

@@ -39,3 +39,6 @@ config.ini
 .env
 keys.py
 secrets.json
+.vscode/
+*.sh
+*.json
