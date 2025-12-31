@@ -42,3 +42,5 @@ secrets.json
 .vscode/
 *.sh
 *.json
+*.log
+

@@ -26,10 +26,15 @@ from ingest import get_db_connection, load_to_sql
 
 if __name__ == "__main__":
     raw = run_speedtest()
-    server_ip = raw["server"]["ip"]
-    server_meta = get_server_info(server_ip)
+
+    if raw is None:
+        console.print("[bold red]Speedtest returned no data. Skipping this run.[/]")
+        raise SystemExit(1)
+
     row = transform(raw)
-    
-    connection = get_db_connection()
-    
+
+    if row is None:
+        console.print("[bold red]Transform failed. Skipping this run.[/]")
+        raise SystemExit(1)
+
     load_to_sql(row)
