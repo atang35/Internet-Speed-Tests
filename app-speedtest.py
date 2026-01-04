@@ -14,22 +14,27 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from shiny import App, render, render_plot, ui, reactive
 
+
+from helpers import get_db_connection, load_sql_files, time_bounds, fetch_time_bounds
+
 #from helpers import db_connection
 from rich.console import Console
 
 console = Console()
 
-
-#------------ env ---------------------------------------------------
-
+#========================================================
+#               Define .env variables
+#=========================================================
 PROJECT_DIR = Path.cwd()
-
+RESOURCES_DIR = PROJECT_DIR / "resources"
 
 env_file = PROJECT_DIR / '.env'
 load_dotenv(env_file)
 
-
+#=======================================================================
+# Connect to the data source 
 # Load database credentials from .env variable
+#===================================================================
 DRIVER = os.getenv("SQLSERVER_DRIVER", "ODBC Driver 18 for SQL Server")
 HOST = os.getenv("SQLSERVER_HOST", "127.0.0.1")
 PORT = os.getenv("SQLSERVER_PORT", "1433")
@@ -41,48 +46,84 @@ PWD = os.getenv("SQLSERVER_PWD")
 if not PWD:
     raise RuntimeError("Missing Database password in .env")
 
-def db_connection():
-    connection_string = (
-        f"DRIVER={{{DRIVER}}};"
-        f"SERVER={HOST},{PORT};"
-        f"DATABASE={DB};"
-        f"UID={UID};"
-        f"PWD={PWD};"
-        "TrustServerCertificate=yes;"
-        "Encrypt=yes;"
-        "Login Timeout=30;"
-        "Connect Timeout=30;"
-    )
-    
-    return pyodbc.connect(connection_string)
 
 
-# -----------------------------  UI --------------
+#==========================================================
+# SQL queries to get data from the database
+#==========================================================
 
-app_ui = ui.page_fluid(
-    ui.h2("Internet Speed Dashboard"),
-    ui.layout_sidebar(
-        ui.sidebar(
-            ui.input_date("start_date", "Start Date", value=(datetime.today() - timedelta(days=7)).date()),
-            ui.input_date("end_date", "End Date", value=datetime.today().date()),
-            ui.input_action_button("refresh", "Refresh"),
-        ),
-        ui.layout_columns(
-            ui.value_box("Latest Download (Mbps)", ui.output_text("kpi_down")),
-            ui.value_box("Latest Upload (Mbps)", ui.output_text("kpi_up")),
-            ui.value_box("Latest Latency (ms)", ui.output_text("kpi_latency")),
-        ),
-        ui.hr(),
-        ui.h4("Trends"),
-        ui.output_plot("trend_plot"),
-        ui.hr(),
-        ui.h4("Raw Data"), 
-        ui.output_data_frame("table")
+SQL_LATEST = load_sql_files("01_latest.sql")
+SQL_RAW_RANGE = load_sql_files("02_raw_range.sql")
+SQL_HOURLY_MEDIANS = load_sql_files("03_median_speeds.sql")
+SQL_TIME_BOUNDS = load_sql_files("04_time_bounds.sql")
+
+#============================================================
+#               Get data using the queries
+#=============================================================
+
+with get_db_connection() as conn:
+    raw_range_df = pd.read_sql(SQL_RAW_RANGE, conn)
+    median_speeds_df = pd.read_sql(SQL_HOURLY_MEDIANS, conn)
+
+
+
+
+#==============================================================================================
+#                       App UI Elements
+#==============================================================================================
+
+app_ui = ui.page_sidebar(
+    ui.sidebar(
+        ui.input_select(
+            "metric",
+            "Metric",
+            choices={
+                "download_mbps": "Download (Mbps)",
+                "upload_mbps": "Upload (Mbps)",
+                "latency_ms": "Latency (ms)"
+                },
+            selected = "downloads_mbps",
+            ),
+        ui.input_date(
+            "start_date",
+            "Start Date",
+            value = (datetime.today() - timedelta(days=7)).date()),
+        ui.input_date(
+            "end_date", 
+            "End Date",
+            value = datetime.today().date()
+            ),
+        ui.input_action_button("refresh", "Refresh"),
     ),
+    ui.h2("Internet Speed Dashboard"),
+    ui.layout_column_wrap(
+        ui.value_box("Actual",
+                     ui.output_ui("kpi_actual"),
+                     showcase=icon_svg("rocket"),
+                     ),
+        ui.value_box("Change",
+                     ui.output_ui("kpi_change_abs"),
+                     showcase=icon_svg("change_icon")
+                     ),
+        ui.value_box("% Change",
+                     ui.output_ui("kpi_change_pct"),
+                     showcase=icon_svg("percent")
+                     ),        
+        ),
+    ui.hr(),
     
+    ui.h4("Trend"),
+    ui.output_plot("trend_plot"),
+    
+    ui.hr(),
+    
+    ui.h4("Raw Data"),
+    ui.output_data_frame("table")
 )
 
+#===============================================================================
 # ------------------------------------------- Server ---------------------------
+#===============================================================================
 def server(input, output, session):
     
     @reactive.calc
