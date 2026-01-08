@@ -12,6 +12,7 @@ import pytz
 from pathlib import Path
 
 from sqlalchemy import text, create_engine
+from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
 from datetime import datetime
 from rich.console import Console
@@ -20,6 +21,8 @@ from rich.console import Console
 PROJECT_DIR = Path.cwd()
 
 SQL_DIR = PROJECT_DIR / "sql"
+
+load_dotenv(PROJECT_DIR / ".env")
 
 # initialise console
 console = Console()
@@ -128,11 +131,8 @@ def db_connection():
         "Connect Timeout=90;"   
     )
     try:
-        conn = pyodbc.connect(conn_str, timeout=10)
-        conn.autocommit=False
-        cursor = conn.execute("USE InternetSpeed_DB")
-        cursor.close()
-        
+        conn = pyodbc.connect(connection_string, timeout=10)
+        conn.autocommit=False        
         return conn
     except pyodbc.Error as e:
         console.print(f"[bold red]Database connection failed: {e}[/]")
@@ -197,3 +197,25 @@ def get_db_connection():
 def fetch_time_bounds(conn, sql_time_bounds: str):
     b = pd.read_sql(sql_time_bounds, conn).iloc[0]
     return pd.to_datetime(b["min_dt"]), pd.to_datetime(b["max_dt"])
+
+
+from sqlalchemy import text
+
+def run_sql(engine, filename: str, params: dict | None = None) -> pd.DataFrame:
+    sql = load_sql_files(filename)
+
+    with engine.connect() as conn:
+        # If query uses positional params (?), pass a tuple in the correct order
+        if params and ("?" in sql):
+            return pd.read_sql(
+                sql,
+                conn,
+                params=(params["start_dt"], params["end_dt"]),
+            )
+
+        # If query uses named binds (:start_dt), pass dict params
+        if params:
+            return pd.read_sql(text(sql), conn, params=params)
+
+        # No params
+        return pd.read_sql(text(sql), conn)

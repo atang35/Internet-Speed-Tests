@@ -29,12 +29,14 @@ if __name__ == "__main__":
 
     if raw is None:
         console.print("[bold red]Speedtest returned no data. Skipping this run.[/]")
+        console.print("===============================================================")
         raise SystemExit(1)
 
     row = transform(raw)
 
     if row is None:
         console.print("[bold red]Transform failed. Skipping this run.[/]")
+        console.print("===============================================================")
         raise SystemExit(1)
 
     load_to_sql(row)
